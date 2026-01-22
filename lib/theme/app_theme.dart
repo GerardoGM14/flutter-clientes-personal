@@ -12,6 +12,7 @@ class AppTheme {
   // Colores Pastel Vibrantes (Más saturados para destacar)
   static const Color pastelOrange = Color(0xFFFFDAC1);
   static const Color pastelLime = Color(0xFFC1E1C1); // Verde más fresco
+  static const Color pastelGreen = Color(0xFFB5EAD7); // Verde menta clásico
   static const Color pastelLavender = Color(0xFFC7CEEA);
   static const Color pastelPink = Color(0xFFFFB7B2);
   static const Color pastelBlue = Color(0xFFA2E1DB); // Nuevo Cyan pastel
