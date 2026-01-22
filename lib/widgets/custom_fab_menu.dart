@@ -43,6 +43,7 @@ class _CustomFabMenuState extends State<CustomFabMenu> with SingleTickerProvider
   }
 
   void _toggle() {
+    if (!mounted) return;
     setState(() {
       _isOpen = !_isOpen;
       if (_isOpen) {
@@ -101,6 +102,7 @@ class _CustomFabMenuState extends State<CustomFabMenu> with SingleTickerProvider
 
         // Botón Principal
         FloatingActionButton(
+          heroTag: "fab_menu_plus",
           onPressed: _toggle,
           backgroundColor: AppTheme.textDark,
           child: RotationTransition(

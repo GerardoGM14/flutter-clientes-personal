@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../models/trabajo.dart';
 import '../widgets/custom_fab_menu.dart'; // Importamos el menú animado
 import '../widgets/floating_background.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Perfil de Usuario
   String _userName = "Creativo";
   int _selectedAvatarIndex = 0;
+  int _touchedIndex = -1; // Para la animación del gráfico circular
   
   // Usamos getter para evitar problemas de Hot Reload con listas nuevas
   List<Color> get _avatarColors => [
@@ -236,7 +238,27 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: const CustomFabMenu(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            FloatingActionButton(
+              heroTag: "fab_quick_actions",
+              onPressed: () {
+                // Acción rápida
+              },
+              backgroundColor: Colors.white,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              child: const Icon(Icons.bolt, color: AppTheme.textDark),
+            ),
+            const CustomFabMenu(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -271,16 +293,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildHeroCard(),
                 const SizedBox(height: 30),
-                Text(
-                  "Historial de Trabajos",
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textDark,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ...trabajos.map((trabajo) => _buildTimelineItem(trabajo)),
+                _buildActivityChart(),
+                const SizedBox(height: 30),
+                _buildCategoryPieChart(),
                 const SizedBox(height: 80),
               ],
             ),
@@ -766,6 +781,440 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildActivityChart() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Text(
+            "Resumen de Actividad",
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textDark,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            height: 300,
+            child: BarChart(
+              BarChartData(
+                rotationQuarterTurns: 1,
+                alignment: BarChartAlignment.spaceAround,
+                maxY: 20,
+                barTouchData: BarTouchData(
+                  enabled: false,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => Colors.transparent,
+                    tooltipPadding: EdgeInsets.zero,
+                    tooltipMargin: 8,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        rod.toY.round().toString(),
+                        GoogleFonts.poppins(
+                          color: AppTheme.textDark,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (double value, TitleMeta meta) {
+                        const style = TextStyle(
+                          color: Color(0xff7589a2),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        );
+                        String text;
+                        switch (value.toInt()) {
+                          case 0:
+                            text = 'Lun';
+                            break;
+                          case 1:
+                            text = 'Mar';
+                            break;
+                          case 2:
+                            text = 'Mié';
+                            break;
+                          case 3:
+                            text = 'Jue';
+                            break;
+                          case 4:
+                            text = 'Vie';
+                            break;
+                          case 5:
+                            text = 'Sáb';
+                            break;
+                          case 6:
+                            text = 'Dom';
+                            break;
+                          default:
+                            text = '';
+                        }
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: 4,
+                          child: Text(text, style: style),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                gridData: const FlGridData(show: false),
+                barGroups: [
+                  _makeBarGroup(0, 5, AppTheme.pastelBlue),
+                  _makeBarGroup(1, 10, AppTheme.pastelOrange),
+                  _makeBarGroup(2, 14, AppTheme.pastelPink),
+                  _makeBarGroup(3, 15, AppTheme.pastelLime),
+                  _makeBarGroup(4, 13, AppTheme.pastelLavender),
+                  _makeBarGroup(5, 10, AppTheme.pastelGreen),
+                  _makeBarGroup(6, 16, AppTheme.pastelBlue),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  BarChartGroupData _makeBarGroup(int x, double y, Color color) {
+    return BarChartGroupData(
+      x: x,
+      barRods: [
+        BarChartRodData(
+          toY: y,
+          color: color,
+          width: 16,
+          borderRadius: BorderRadius.circular(8),
+          backDrawRodData: BackgroundBarChartRodData(
+            show: true,
+            toY: 20,
+            color: Colors.grey.withOpacity(0.1),
+          ),
+        ),
+      ],
+      showingTooltipIndicators: [0],
+    );
+  }
+
+  Widget _buildCategoryPieChart() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Text(
+            "Distribución de Proyectos",
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textDark,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 250, // Aumentamos altura para dar espacio a la animación
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Texto Central
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "Total",
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          "25",
+                          style: GoogleFonts.poppins(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    PieChart(
+                      PieChartData(
+                        pieTouchData: PieTouchData(
+                          touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                            setState(() {
+                              if (!event.isInterestedForInteractions ||
+                                  pieTouchResponse == null ||
+                                  pieTouchResponse.touchedSection == null) {
+                                return;
+                              }
+                              if (event is FlTapUpEvent) {
+                                final newIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                                if (_touchedIndex == newIndex) {
+                                  _touchedIndex = -1;
+                                } else {
+                                  _touchedIndex = newIndex;
+                                }
+                              }
+                            });
+                          },
+                        ),
+                        borderData: FlBorderData(show: false),
+                        sectionsSpace: 4, // Espacio entre secciones
+                        centerSpaceRadius: 60, // Centro más grande
+                        sections: _showingSections(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 300),
+                crossFadeState: _touchedIndex == -1 ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+                firstChild: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildLegendItem(AppTheme.pastelBlue, "Diseño"),
+                        const SizedBox(width: 24),
+                        _buildLegendItem(AppTheme.pastelOrange, "Dev"),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildLegendItem(AppTheme.pastelPink, "MKT"),
+                        const SizedBox(width: 24),
+                        _buildLegendItem(AppTheme.pastelLime, "Foto"),
+                      ],
+                    ),
+                  ],
+                ),
+                secondChild: _buildSelectedCategoryDetails(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelectedCategoryDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(color: Colors.grey.shade200),
+        const SizedBox(height: 10),
+        Text(
+          _getCategoryName(_touchedIndex),
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textDark,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ..._getCategoryJobs(_touchedIndex).map((trabajo) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildTimelineItem(trabajo),
+            )),
+        if (_getCategoryJobs(_touchedIndex).isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: Text(
+                "No hay trabajos recientes",
+                style: GoogleFonts.poppins(color: Colors.grey),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _getCategoryName(int index) {
+    switch (index) {
+      case 0: return "Diseño";
+      case 1: return "Desarrollo";
+      case 2: return "Marketing";
+      case 3: return "Fotografía";
+      default: return "";
+    }
+  }
+
+  List<Trabajo> _getCategoryJobs(int index) {
+    Color targetColor;
+    switch (index) {
+      case 0: targetColor = AppTheme.pastelBlue; break;
+      case 1: targetColor = AppTheme.pastelOrange; break;
+      case 2: targetColor = AppTheme.pastelPink; break;
+      case 3: targetColor = AppTheme.pastelLime; break;
+      default: return [];
+    }
+    // Filtramos trabajos que coincidan con el color de la categoría
+    // Nota: En una app real usarías un ID de categoría, aquí usamos el color por simplicidad
+    return trabajos.where((t) => t.colorTarjeta == targetColor).toList();
+  }
+
+  List<PieChartSectionData> _showingSections() {
+    return List.generate(4, (i) {
+      final isTouched = i == _touchedIndex;
+      final fontSize = isTouched ? 20.0 : 16.0;
+      final radius = isTouched ? 60.0 : 50.0;
+
+      switch (i) {
+        case 0:
+          return PieChartSectionData(
+            color: AppTheme.pastelBlue,
+            value: 40,
+            title: '40%',
+            radius: radius,
+            titleStyle: GoogleFonts.poppins(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
+          );
+        case 1:
+          return PieChartSectionData(
+            color: AppTheme.pastelOrange,
+            value: 30,
+            title: '30%',
+            radius: radius,
+            titleStyle: GoogleFonts.poppins(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
+          );
+        case 2:
+          return PieChartSectionData(
+            color: AppTheme.pastelPink,
+            value: 15,
+            title: '15%',
+            radius: radius,
+            titleStyle: GoogleFonts.poppins(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
+          );
+        case 3:
+          return PieChartSectionData(
+            color: AppTheme.pastelLime,
+            value: 15,
+            title: '15%',
+            radius: radius,
+            titleStyle: GoogleFonts.poppins(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
+          );
+        default:
+          throw Error();
+      }
+    });
+  }
+
+  Widget _buildLegendItem(Color color, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppTheme.textDark.withOpacity(0.6),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTimelineItem(Trabajo trabajo) {
     return Stack(
       children: [
@@ -820,7 +1269,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 margin: const EdgeInsets.only(bottom: 24),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: trabajo.colorTarjeta.withOpacity(0.5),
+                  // Color vivo con un toque de transparencia (0.85) para ver el fondo sutilmente
+                  color: Color.lerp(trabajo.colorTarjeta, Colors.white, 0.2)!.withOpacity(0.85),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
@@ -875,6 +1325,50 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge(
+    this.icon, {
+    required this.size,
+    required this.borderColor,
+  });
+  final IconData icon;
+  final double size;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: borderColor,
+          width: 2,
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(.2),
+            offset: const Offset(3, 3),
+            blurRadius: 3,
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(size * .15),
+      child: Center(
+        child: FittedBox(
+          child: Icon(
+            icon,
+            color: AppTheme.textDark,
+          ),
+        ),
+      ),
     );
   }
 }

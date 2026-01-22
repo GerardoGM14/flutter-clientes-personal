@@ -14,27 +14,32 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
   late List<Animation<Offset>> _animations;
   final Random _random = Random();
 
+  // Tamaños definidos como pidió el usuario
+  final List<double> _fixedSizes = [40.0, 60.0, 80.0, 100.0, 120.0];
+
   @override
   void initState() {
     super.initState();
     _controllers = List.generate(5, (index) {
       return AnimationController(
         vsync: this,
-        duration: Duration(seconds: 20 + _random.nextInt(15)),
-      )..repeat(reverse: false); // Rotación continua
+        duration: Duration(seconds: 20 + _random.nextInt(15)), // Rotación suave constante
+      )..repeat(reverse: false);
     });
 
     _animations = _controllers.map((controller) {
+      // Movimiento de flotación muy suave
       return Tween<Offset>(
         begin: Offset(_random.nextDouble() * 1.8 - 0.9, _random.nextDouble() * 1.8 - 0.9),
         end: Offset(_random.nextDouble() * 1.8 - 0.9, _random.nextDouble() * 1.8 - 0.9),
-      ).animate(CurvedAnimation(parent: controller, curve: Curves.linear));
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
     }).toList();
   }
 
   @override
   void dispose() {
     for (var controller in _controllers) {
+      controller.stop();
       controller.dispose();
     }
     super.dispose();
@@ -44,7 +49,7 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Fondo limpio
+        // Fondo base limpio
         Container(color: const Color(0xFFFAFBFC)),
         
         ...List.generate(5, (index) {
@@ -59,10 +64,10 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
                 child: Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001) // Perspectiva
+                    // Eliminada la perspectiva (setEntry) para evitar el efecto de "respiración"
                     ..rotateX(_controllers[index].value * 2 * pi)
                     ..rotateY(_controllers[index].value * 2 * pi)
-                    ..rotateZ(_controllers[index].value * 2 * pi),
+                    ..rotateZ(_controllers[index].value * pi), // Rotación completa en varios ejes
                   child: _buildTrue3DCube(index),
                 ),
               );
@@ -70,12 +75,11 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
           );
         }),
         
-        // Desenfoque sutil (comentado temporalmente para pruebas de visibilidad si es necesario, 
-        // pero lo dejamos suave para que se noten los cubos)
+        // Desenfoque para integrar con el fondo (efecto "dreamy")
         BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Reducimos blur para ver mejor
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Menos blur para que se noten más
           child: Container(
-            color: Colors.white.withOpacity(0.1), // Menos opacidad blanca
+            color: Colors.white.withOpacity(0.1), // Menos capa blanca para que se vean más los cubos
           ),
         ),
       ],
@@ -83,15 +87,17 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
   }
 
   Widget _buildTrue3DCube(int index) {
+    // Tonos de gris (plomo)
     final colors = [
-      const Color(0xFF2196F3), // Azul más fuerte
-      const Color(0xFF4CAF50), // Verde más fuerte
-      const Color(0xFFFF9800), // Naranja más fuerte
-      const Color(0xFF9C27B0), // Violeta más fuerte
-      const Color(0xFFF44336), // Rojo más fuerte
+      Colors.grey[400]!,
+      Colors.blueGrey[200]!,
+      Colors.grey[300]!,
+      Colors.blueGrey[100]!,
+      Colors.grey[500]!,
     ];
 
-    double size = 60.0 + _random.nextInt(40); // Un poco más pequeños para que se muevan mejor
+    // Usar tamaño fijo de la lista o fallback si el índice excede
+    double size = _fixedSizes[index % _fixedSizes.length];
     Color baseColor = colors[index % colors.length];
 
     return SizedBox(
@@ -103,7 +109,7 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
           Transform(
             transform: Matrix4.identity()..translate(0.0, 0.0, -size/2),
             alignment: Alignment.center,
-            child: _buildFace(size, baseColor.withOpacity(0.8)), // Más opacidad
+            child: _buildFace(size, baseColor.withOpacity(0.8)),
           ),
           // Cara Frontal
           Transform(
@@ -154,14 +160,7 @@ class _FloatingBackgroundState extends State<FloatingBackground> with TickerProv
       height: size,
       decoration: BoxDecoration(
         color: color,
-        border: Border.all(color: Colors.white, width: 2), // Borde blanco sólido
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.4),
-            blurRadius: 10,
-            spreadRadius: 2,
-          )
-        ]
+        border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5), // Borde definido
       ),
     );
   }
