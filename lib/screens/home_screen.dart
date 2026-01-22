@@ -25,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   String _filterType = "Todos"; // Todos, Por Fecha, Por Cliente
+  String? _selectedClient; // Cliente seleccionado para el filtro
+  bool? _isDropdownOpen = false; // Estado del dropdown personalizado
 
   // Perfil de Usuario
   String _userName = "Creativo";
@@ -269,17 +271,15 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
           child: _buildHeader(title: "Tu Dashboard"),
         ),
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
             children: [
-              _buildTabPill("Todos", 0),
+              Expanded(child: _buildTabPill("Todos", 0)),
               const SizedBox(width: 12),
-              _buildTabPill("Pendientes", 1),
+              Expanded(child: _buildTabPill("Pendientes", 1)),
               const SizedBox(width: 12),
-              _buildTabPill("Pagados", 2),
+              Expanded(child: _buildTabPill("Pagados", 2)),
             ],
           ),
         ),
@@ -296,6 +296,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildActivityChart(),
                 const SizedBox(height: 30),
                 _buildCategoryPieChart(),
+                const SizedBox(height: 30),
+                _buildMonthlyGoals(),
                 const SizedBox(height: 80),
               ],
             ),
@@ -305,27 +307,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildClientsView() {
-    // Lógica de Filtrado
-    List<Trabajo> filteredTrabajos = trabajos;
-    
-    if (_selectedDay != null && _filterType == "Por Fecha") {
-      filteredTrabajos = trabajos.where((t) {
-        return isSameDay(t.fechaEntrega, _selectedDay);
-      }).toList();
-    }
-
+  Widget _buildMonthlyGoals() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-          child: _buildHeader(title: "Tus Trabajos"),
-        ),
-        
-        // Calendario
         Container(
-          margin: const EdgeInsets.all(24),
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Text(
+            "Metas Mensuales",
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textDark,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(30),
@@ -337,16 +347,140 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          child: TableCalendar(
-            locale: 'es_ES',
-            firstDay: DateTime.utc(2020, 10, 16),
-            lastDay: DateTime.utc(2030, 3, 14),
-            focusedDay: _focusedDay,
-            calendarFormat: _calendarFormat,
-            availableCalendarFormats: const {
-              CalendarFormat.month: 'Mes',
-              CalendarFormat.week: 'Semana',
-            },
+          child: Column(
+            children: [
+              _buildGoalItem("Ingresos", 2450, 3000, AppTheme.pastelGreen),
+              const SizedBox(height: 20),
+              _buildGoalItem("Proyectos", 5, 8, AppTheme.pastelBlue),
+              const SizedBox(height: 20),
+              _buildGoalItem("Nuevos Clientes", 2, 5, AppTheme.pastelOrange),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGoalItem(String title, double current, double target, Color color) {
+    final double progress = (current / target).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+            Text(
+              "${(progress * 100).toInt()}%",
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                Container(
+                  height: 10,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOutCubic,
+                  height: 10,
+                  width: constraints.maxWidth * progress,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            "${current.toInt()} / ${target.toInt()}",
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: Colors.grey[400],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClientsView() {
+    // Lógica de Filtrado
+    List<Trabajo> filteredTrabajos = trabajos;
+    List<Trabajo> calendarEvents = trabajos; // Eventos para el calendario
+    
+    if (_filterType == "Por Fecha" && _selectedDay != null) {
+      filteredTrabajos = trabajos.where((t) {
+        return isSameDay(t.fechaEntrega, _selectedDay);
+      }).toList();
+    } else if (_filterType == "Por Cliente") {
+      if (_selectedClient != null) {
+        filteredTrabajos = trabajos.where((t) => t.cliente == _selectedClient).toList();
+        calendarEvents = filteredTrabajos;
+      }
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          child: _buildHeader(title: "Tus Trabajos"),
+        ),
+        
+        // Calendario
+        AnimatedSize(
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+          child: Container(
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: TableCalendar(
+              locale: 'es_ES',
+              firstDay: DateTime.utc(2020, 10, 16),
+              lastDay: DateTime.utc(2030, 3, 14),
+              focusedDay: _focusedDay,
+              calendarFormat: _calendarFormat,
+              formatAnimationDuration: const Duration(milliseconds: 500),
+              availableCalendarFormats: const {
+                CalendarFormat.month: 'Mes',
+                CalendarFormat.week: 'Semana',
+              },
             selectedDayPredicate: (day) {
               return isSameDay(_selectedDay, day);
             },
@@ -355,6 +489,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
                 _filterType = "Por Fecha"; // Activar filtro automáticamente
+                _selectedClient = null;
+                _calendarFormat = CalendarFormat.week;
               });
             },
             onFormatChanged: (format) {
@@ -391,26 +527,28 @@ class _HomeScreenState extends State<HomeScreen> {
               rightChevronIcon: const Icon(Icons.chevron_right, color: AppTheme.textDark),
             ),
             eventLoader: (day) {
-              return trabajos.where((t) => isSameDay(t.fechaEntrega, day)).toList();
+              return calendarEvents.where((t) => isSameDay(t.fechaEntrega, day)).toList();
             },
           ),
         ),
+      ),
 
         // Filtros Animados
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
             children: [
-              _buildFilterChip("Todos", _filterType == "Todos"),
+              Expanded(child: _buildFilterChip("Todos", _filterType == "Todos")),
               const SizedBox(width: 12),
-              _buildFilterChip("Por Fecha", _filterType == "Por Fecha"),
+              Expanded(child: _buildFilterChip("Por Fecha", _filterType == "Por Fecha")),
               const SizedBox(width: 12),
-              _buildFilterChip("Por Cliente", _filterType == "Por Cliente"),
+              Expanded(child: _buildFilterChip("Por Cliente", _filterType == "Por Cliente")),
             ],
           ),
         ),
+        
+        // Selector de Cliente
+        _buildClientSelector(),
 
         Expanded(
           child: SingleChildScrollView(
@@ -419,20 +557,38 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
-                if (filteredTrabajos.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 40),
-                      child: Text(
-                        "No hay trabajos para esta fecha",
-                        style: GoogleFonts.poppins(color: Colors.grey),
+                if (_filterType == "Por Cliente" && _selectedClient == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.touch_app_outlined, size: 48, color: Colors.grey[300]),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Selecciona un cliente arriba",
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                        ],
                       ),
                     ),
                   )
-                else
-                  ...filteredTrabajos.map((trabajo) => _buildTimelineItem(trabajo)),
-                const SizedBox(height: 80),
+                else ...[
+                  const SizedBox(height: 20),
+                  if (filteredTrabajos.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: Text(
+                          "No hay trabajos para esta selección",
+                          style: GoogleFonts.poppins(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    ...filteredTrabajos.map((trabajo) => _buildTimelineItem(trabajo)),
+                  const SizedBox(height: 80),
+                ],
               ],
             ),
           ),
@@ -447,37 +603,163 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _filterType = label;
           if (label == "Todos") {
-            _selectedDay = null; // Limpiar selección de fecha
+            _selectedDay = null;
+            _selectedClient = null;
+            _calendarFormat = CalendarFormat.week;
+          } else if (label == "Por Fecha") {
+            _selectedClient = null;
+          } else if (label == "Por Cliente") {
+            _selectedDay = null;
           }
         });
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.textDark : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(30),
           border: isSelected ? null : Border.all(color: Colors.grey.shade200),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.textDark.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : [],
         ),
         child: Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
             color: isSelected ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w600,
+            height: 1.0,
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildClientSelector() {
+    if (_filterType != "Por Cliente") return const SizedBox.shrink();
+
+    final clients = trabajos.map((t) => t.cliente).toSet().toList();
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _isDropdownOpen = !(_isDropdownOpen ?? false);
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _selectedClient ?? "Selecciona un cliente",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    color: _selectedClient != null ? AppTheme.textDark : Colors.grey,
+                    fontSize: 16,
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: (_isDropdownOpen ?? false) ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.keyboard_arrow_down, color: AppTheme.textDark),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: Container(
+            height: (_isDropdownOpen ?? false) ? null : 0,
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              child: Column(
+                children: clients.map((client) {
+                  final isSelected = client == _selectedClient;
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedClient = client;
+                          _isDropdownOpen = false;
+                          _calendarFormat = CalendarFormat.month;
+                        });
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(color: Colors.grey.shade100),
+                          ),
+                          color: isSelected ? AppTheme.pastelBlue.withOpacity(0.1) : null,
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppTheme.pastelBlue, // Podríamos usar un color único por cliente
+                              child: Text(
+                                client[0].toUpperCase(),
+                                style: GoogleFonts.poppins(
+                                  color: AppTheme.textDark,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              client,
+                              style: GoogleFonts.poppins(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                            if (isSelected) ...[
+                              const Spacer(),
+                              const Icon(Icons.check, color: AppTheme.textDark, size: 20),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -528,21 +810,19 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => setState(() => _selectedTab = index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0), // Sin padding vertical extra, centrado por el contenedor
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.textDark : Colors.white,
           borderRadius: BorderRadius.circular(30),
           border: isSelected ? null : Border.all(color: Colors.grey.shade200),
         ),
-        child: Center(
-          child: Text(
-            text,
-            style: GoogleFonts.poppins(
-              color: isSelected ? Colors.white : Colors.grey[600],
-              fontWeight: FontWeight.w600,
-              height: 1.0, // Interlineado compacto para centrado perfecto
-            ),
+        child: Text(
+          text,
+          style: GoogleFonts.poppins(
+            color: isSelected ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w600,
+            height: 1.0,
           ),
         ),
       ),
@@ -722,11 +1002,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       )
                     ] else
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: (card["stats"] as List).map<Widget>((stat) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 20),
-                            child: _buildMiniStat(stat["label"], stat["value"]),
-                          );
+                          return _buildMiniStat(stat["label"], stat["value"]);
                         }).toList(),
                       )
                   ],
@@ -1267,58 +1545,72 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: Container(
                 margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(10), // Borde blanco "grande"
                 decoration: BoxDecoration(
-                  // Color vivo con un toque de transparencia (0.85) para ver el fondo sutilmente
-                  color: Color.lerp(trabajo.colorTarjeta, Colors.white, 0.2)!.withOpacity(0.85),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            trabajo.cliente,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: AppTheme.textDark.withOpacity(0.6),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            trabajo.descripcion,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textDark,
-                            ),
-                          ),
-                        ],
-                      ),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        "\$${trabajo.pago.toInt()}",
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textDark,
+                  ],
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Color.lerp(trabajo.colorTarjeta, Colors.white, 0.2)!.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              trabajo.cliente,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: AppTheme.textDark.withOpacity(0.6),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              trabajo.descripcion,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    )
-                  ],
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6), // Más sutil dentro del color
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          "\$${trabajo.pago.toInt()}",
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
                 ),
               ),
             ),
