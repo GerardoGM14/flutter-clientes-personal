@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../models/trabajo.dart';
 import '../widgets/custom_fab_menu.dart'; // Importamos el menú animado
+import '../widgets/floating_background.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -198,10 +199,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: _currentBottomNavIndex == 0 
-            ? _buildDashboardView()
-            : _buildClientsView(),
+      body: Stack(
+        children: [
+          Positioned.fill(child: FloatingBackground()),
+          SafeArea(
+            child: _currentBottomNavIndex == 0 
+                ? _buildDashboardView()
+                : _buildClientsView(),
+          ),
+        ],
       ),
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
@@ -633,14 +639,81 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 1.0,
                       ),
                     ),
-                    Row(
-                      children: (card["stats"] as List).map<Widget>((stat) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 20),
-                          child: _buildMiniStat(stat["label"], stat["value"]),
-                        );
-                      }).toList(),
-                    )
+                    if (card["hasProgress"] == true) ...[
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: LinearProgressIndicator(
+                                    value: card["progress"],
+                                    backgroundColor: Colors.white.withOpacity(0.5),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textDark),
+                                    minHeight: 8,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                "${(card["progress"] * 100).toInt()}%",
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textDark,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 80,
+                                height: 30,
+                                child: Stack(
+                                  children: List.generate((card["avatars"] as List).length, (idx) {
+                                    return Positioned(
+                                      left: idx * 20.0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 12,
+                                          backgroundColor: card["avatars"][idx],
+                                          child: const Icon(Icons.person, size: 14, color: Colors.white),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ),
+                              Text(
+                                "+2 más",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: AppTheme.textDark.withOpacity(0.6),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    ] else
+                      Row(
+                        children: (card["stats"] as List).map<Widget>((stat) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 20),
+                            child: _buildMiniStat(stat["label"], stat["value"]),
+                          );
+                        }).toList(),
+                      )
                   ],
                 ),
               );
