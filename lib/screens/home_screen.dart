@@ -1,8 +1,11 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/trabajo.dart';
 import '../widgets/custom_fab_menu.dart'; // Importamos el menú animado
 import '../widgets/floating_background.dart';
@@ -31,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Perfil de Usuario
   String _userName = "Creativo";
   int _selectedAvatarIndex = 0;
+  File? _profileImage; // Imagen de perfil personalizada
   int _touchedIndex = -1; // Para la animación del gráfico circular
   
   // Usamos getter para evitar problemas de Hot Reload con listas nuevas
@@ -134,8 +138,59 @@ class _HomeScreenState extends State<HomeScreen> {
                   onChanged: (val) => _userName = val,
                 ),
                 const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () async {
+                    final ImagePicker picker = ImagePicker();
+                    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                    if (image != null) {
+                      setState(() {
+                        _profileImage = File(image.path);
+                        _selectedAvatarIndex = -1; // Deseleccionar avatares de color
+                      });
+                      setStateModal(() {}); // Actualizar el modal
+                    }
+                  },
+                  child: Center(
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey[200],
+                            image: _profileImage != null
+                                ? DecorationImage(
+                                    image: FileImage(_profileImage!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                            border: Border.all(color: Colors.grey.shade300, width: 2),
+                          ),
+                          child: _profileImage == null
+                              ? Icon(Icons.camera_alt, color: Colors.grey[400], size: 40)
+                              : null,
+                        ),
+                        if (_profileImage != null)
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: AppTheme.textDark,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 Text(
-                  "Elige un Avatar",
+                  "O elige un Avatar",
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -148,9 +203,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     final isSelected = _selectedAvatarIndex == index;
                     return GestureDetector(
                       onTap: () {
-                        setStateModal(() {
+                        setState(() {
                           _selectedAvatarIndex = index;
+                          _profileImage = null; // Quitar imagen personalizada si elige color
                         });
+                        setStateModal(() {});
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -196,6 +253,321 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showFlashSummary() {
+    // Cálculos rápidos
+    final now = DateTime.now();
+    final earningsToday = trabajos
+        .where((t) => isSameDay(t.fechaEntrega, now))
+        .fold(0.0, (sum, t) => sum + t.pago);
+    
+    final urgentJobs = trabajos.where((t) {
+      final difference = t.fechaEntrega.difference(now).inDays;
+      return difference >= 0 && difference <= 2;
+    }).toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: AppTheme.pastelBlue.withOpacity(0.15), // Tinte suave de color
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            height: 600, // Taller for better layout
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            child: Stack(
+              children: [
+                // Decorative Background Shapes
+                Positioned(
+                  top: -80,
+                  right: -80,
+                  child: Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelBlue.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 100,
+                  left: -50,
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelOrange.withOpacity(0.05),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Title
+                      Text(
+                        "Resumen Flash",
+                        style: GoogleFonts.poppins(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textDark,
+                          height: 1.1,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Earnings Card (Aurora Style)
+                      _buildAuroraCard(
+                        color: AppTheme.pastelGreen,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    "Ganancias Hoy",
+                                    style: GoogleFonts.poppins(
+                                      color: AppTheme.textDark,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  "\$${earningsToday.toStringAsFixed(2)}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.textDark,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppTheme.pastelGreen.withOpacity(0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.attach_money, color: AppTheme.textDark, size: 32),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 32),
+                      
+                      // Split Layout: Image (Left) + Tasks (Right)
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            // Left: Large Mascot Image
+                            SizedBox(
+                              width: 180,
+                              height: 280,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.bottomLeft,
+                                children: [
+                                  // Subtle glow behind image
+                                  Positioned(
+                                    bottom: 20,
+                                    left: 20,
+                                    child: Container(
+                                      width: 140,
+                                      height: 140,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.pastelOrange.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppTheme.pastelOrange.withOpacity(0.3),
+                                            blurRadius: 30,
+                                            spreadRadius: 10,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // The Image
+                                  Positioned(
+                                    bottom: 0,
+                                    left: -20, // Pull slightly off-screen for dynamic look
+                                    child: SizedBox(
+                                      width: 240, // Much larger
+                                      child: Image.asset(
+                                        "assets/images/man_happy.png",
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            // Right: Urgent Tasks List
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4, bottom: 12),
+                                    child: Text(
+                                      "Urgentes",
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: urgentJobs.isEmpty
+                                      ? Center(
+                                          child: Text(
+                                            "Todo al día 🎉",
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.grey[400],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        )
+                                      : ListView.separated(
+                                          padding: const EdgeInsets.only(bottom: 20),
+                                          itemCount: urgentJobs.length,
+                                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                          itemBuilder: (context, index) {
+                                            final job = urgentJobs[index];
+                                            return Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(20),
+                                                border: Border.all(color: AppTheme.pastelBlue.withOpacity(0.1)),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: AppTheme.pastelBlue.withOpacity(0.1),
+                                                    blurRadius: 15,
+                                                    offset: const Offset(0, 5),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    job.descripcion,
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: AppTheme.textDark,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        "Entrega: ",
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize: 11,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        "${job.fechaEntrega.day}/${job.fechaEntrega.month}",
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize: 11,
+                                                          color: AppTheme.pastelOrange,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Action Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.textDark,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            "Entendido",
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
       ),
     );
   }
@@ -250,7 +622,7 @@ class _HomeScreenState extends State<HomeScreen> {
             FloatingActionButton(
               heroTag: "fab_quick_actions",
               onPressed: () {
-                // Acción rápida
+                _showFlashSummary();
               },
               backgroundColor: Colors.white,
               elevation: 4,
@@ -259,6 +631,169 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const CustomFabMenu(),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuroraCard({
+    required Widget child,
+    required Color color,
+    double? height,
+    EdgeInsetsGeometry? padding,
+    VoidCallback? onTap,
+  }) {
+    // Definir paleta dinámica basada en el color de entrada
+    Color baseColor = color;
+    Color accentColor1;
+    Color accentColor2;
+
+    // Lógica de mezcla de colores pasteles
+    if (color.value == AppTheme.pastelGreen.value) {
+      // Caso Verde: Verde Pastel + Verde Agua + Amarillo Pastel
+      baseColor = AppTheme.pastelGreen;
+      accentColor1 = AppTheme.pastelBlue; // Verde agua/Cyan
+      accentColor2 = const Color(0xFFFFFAC8); // Amarillo Pastel Suave
+    } else if (color.value == AppTheme.pastelBlue.value) {
+      // Caso Azul: Azul Pastel + Lavanda + Blanco
+      baseColor = AppTheme.pastelBlue;
+      accentColor1 = AppTheme.pastelLavender;
+      accentColor2 = Colors.white;
+    } else if (color.value == AppTheme.pastelOrange.value) {
+      // Caso Naranja: Naranja Pastel + Amarillo + Rosa
+      baseColor = AppTheme.pastelOrange;
+      accentColor1 = const Color(0xFFFFFAC8); // Amarillo
+      accentColor2 = AppTheme.pastelPink;
+    } else {
+      // Default
+      accentColor1 = Colors.white;
+      accentColor2 = color.withOpacity(0.5);
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          // Borde con efecto de "cortes" de luz (White -> Transparent -> White)
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.white.withOpacity(0.0), // Transparente en el medio para mostrar el fondo
+              Colors.white,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: baseColor.withOpacity(0.12), // Sombra aún más sutil
+              blurRadius: 25,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(2),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white, // Fondo base BLANCO para evitar oscuridad
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Stack(
+            children: [
+              // Capa de Gradiente Pastel MUY suave sobre el blanco
+              Container(
+                decoration: BoxDecoration(
+                   gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white,
+                      baseColor.withOpacity(0.15), // Color muy suave
+                      accentColor1.withOpacity(0.1),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Mancha 1: Verde Agua (Top Left)
+              Positioned(
+                top: -60,
+                left: -60,
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accentColor1.withOpacity(0.4), // Un poco más fuerte para que se note el gradiente
+                  ),
+                ),
+              ),
+              // Mancha 2: Verde Pastel (Bottom Right)
+              Positioned(
+                bottom: -60,
+                right: -60,
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: baseColor.withOpacity(0.4),
+                  ),
+                ),
+              ),
+              // Mancha 3: Destello Amarillo (Center/Floating)
+              Positioned(
+                top: 30,
+                right: 50,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accentColor2.withOpacity(0.4), // Amarillo más brillante
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentColor2.withOpacity(0.6),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+               // Mancha 4: Acento extra
+              Positioned(
+                bottom: 50,
+                left: 30,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accentColor1.withOpacity(0.25),
+                  ),
+                ),
+              ),
+              // Blur Mesh para mezclar todo suavemente
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                  child: Container(
+                    color: Colors.transparent,
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: padding ?? const EdgeInsets.all(24),
+                child: child,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -445,154 +980,163 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-          child: _buildHeader(title: "Tus Trabajos"),
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            child: _buildHeader(title: "Tus Trabajos"),
+          ),
         ),
         
         // Calendario
-        AnimatedSize(
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-          child: Container(
-            margin: const EdgeInsets.all(24),
-            padding: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+        SliverToBoxAdapter(
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: Container(
+              margin: const EdgeInsets.all(24),
+              padding: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: TableCalendar(
+                locale: 'es_ES',
+                firstDay: DateTime.utc(2020, 10, 16),
+                lastDay: DateTime.utc(2030, 3, 14),
+                focusedDay: _focusedDay,
+                calendarFormat: _calendarFormat,
+                formatAnimationDuration: const Duration(milliseconds: 500),
+                availableCalendarFormats: const {
+                  CalendarFormat.month: 'Mes',
+                  CalendarFormat.week: 'Semana',
+                },
+                selectedDayPredicate: (day) {
+                  return isSameDay(_selectedDay, day);
+                },
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                    _filterType = "Por Fecha"; // Activar filtro automáticamente
+                    _selectedClient = null;
+                    _calendarFormat = CalendarFormat.week;
+                  });
+                },
+                onFormatChanged: (format) {
+                  setState(() {
+                    _calendarFormat = format;
+                  });
+                },
+                onPageChanged: (focusedDay) {
+                  _focusedDay = focusedDay;
+                },
+                calendarStyle: CalendarStyle(
+                  todayDecoration: BoxDecoration(
+                    color: AppTheme.pastelBlue.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  selectedDecoration: BoxDecoration(
+                    color: AppTheme.textDark,
+                    shape: BoxShape.circle,
+                  ),
+                  markerDecoration: const BoxDecoration(
+                    color: AppTheme.pastelOrange,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ],
-            ),
-            child: TableCalendar(
-              locale: 'es_ES',
-              firstDay: DateTime.utc(2020, 10, 16),
-              lastDay: DateTime.utc(2030, 3, 14),
-              focusedDay: _focusedDay,
-              calendarFormat: _calendarFormat,
-              formatAnimationDuration: const Duration(milliseconds: 500),
-              availableCalendarFormats: const {
-                CalendarFormat.month: 'Mes',
-                CalendarFormat.week: 'Semana',
-              },
-            selectedDayPredicate: (day) {
-              return isSameDay(_selectedDay, day);
-            },
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-                _filterType = "Por Fecha"; // Activar filtro automáticamente
-                _selectedClient = null;
-                _calendarFormat = CalendarFormat.week;
-              });
-            },
-            onFormatChanged: (format) {
-              setState(() {
-                _calendarFormat = format;
-              });
-            },
-            onPageChanged: (focusedDay) {
-              _focusedDay = focusedDay;
-            },
-            calendarStyle: CalendarStyle(
-              todayDecoration: BoxDecoration(
-                color: AppTheme.pastelBlue.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              selectedDecoration: BoxDecoration(
-                color: AppTheme.textDark,
-                shape: BoxShape.circle,
-              ),
-              markerDecoration: const BoxDecoration(
-                color: AppTheme.pastelOrange,
-                shape: BoxShape.circle,
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                  titleTextStyle: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textDark,
+                  ),
+                  leftChevronIcon: const Icon(Icons.chevron_left, color: AppTheme.textDark),
+                  rightChevronIcon: const Icon(Icons.chevron_right, color: AppTheme.textDark),
+                ),
+                eventLoader: (day) {
+                  return calendarEvents.where((t) => isSameDay(t.fechaEntrega, day)).toList();
+                },
               ),
             ),
-            headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              titleTextStyle: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textDark,
-              ),
-              leftChevronIcon: const Icon(Icons.chevron_left, color: AppTheme.textDark),
-              rightChevronIcon: const Icon(Icons.chevron_right, color: AppTheme.textDark),
-            ),
-            eventLoader: (day) {
-              return calendarEvents.where((t) => isSameDay(t.fechaEntrega, day)).toList();
-            },
           ),
         ),
-      ),
 
         // Filtros Animados
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            children: [
-              Expanded(child: _buildFilterChip("Todos", _filterType == "Todos")),
-              const SizedBox(width: 12),
-              Expanded(child: _buildFilterChip("Por Fecha", _filterType == "Por Fecha")),
-              const SizedBox(width: 12),
-              Expanded(child: _buildFilterChip("Por Cliente", _filterType == "Por Cliente")),
-            ],
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                Expanded(child: _buildFilterChip("Todos", _filterType == "Todos")),
+                const SizedBox(width: 12),
+                Expanded(child: _buildFilterChip("Por Fecha", _filterType == "Por Fecha")),
+                const SizedBox(width: 12),
+                Expanded(child: _buildFilterChip("Por Cliente", _filterType == "Por Cliente")),
+              ],
+            ),
           ),
         ),
         
         // Selector de Cliente
-        _buildClientSelector(),
+        SliverToBoxAdapter(child: _buildClientSelector()),
 
-        Expanded(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_filterType == "Por Cliente" && _selectedClient == null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.touch_app_outlined, size: 48, color: Colors.grey[300]),
-                          const SizedBox(height: 16),
-                          Text(
-                            "Selecciona un cliente arriba",
-                            style: GoogleFonts.poppins(color: Colors.grey),
-                          ),
-                        ],
-                      ),
+        if (_filterType == "Por Cliente" && _selectedClient == null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.touch_app_outlined, size: 48, color: Colors.grey[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Selecciona un cliente arriba",
+                      style: GoogleFonts.poppins(color: Colors.grey),
                     ),
-                  )
-                else ...[
-                  const SizedBox(height: 20),
-                  if (filteredTrabajos.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 40),
-                        child: Text(
-                          "No hay trabajos para esta selección",
-                          style: GoogleFonts.poppins(color: Colors.grey),
-                        ),
-                      ),
-                    )
-                  else
-                    ...filteredTrabajos.map((trabajo) => _buildTimelineItem(trabajo)),
-                  const SizedBox(height: 80),
-                ],
-              ],
+                  ],
+                ),
+              ),
+            ),
+          )
+        else if (filteredTrabajos.isEmpty)
+          SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 40),
+                child: Text(
+                  "No hay trabajos para esta selección",
+                  style: GoogleFonts.poppins(color: Colors.grey),
+                ),
+              ),
+            ),
+          )
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (index == 0) return const SizedBox(height: 20);
+                if (index == filteredTrabajos.length + 1) return const SizedBox(height: 80);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _buildTimelineItem(filteredTrabajos[index - 1]),
+                );
+              },
+              childCount: filteredTrabajos.length + 2,
             ),
           ),
-        ),
       ],
     );
   }
@@ -788,16 +1332,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: CircleAvatar(
-            radius: 24,
-            backgroundColor: _avatarColors[_selectedAvatarIndex],
-            child: const Icon(Icons.person, color: Colors.white),
+        GestureDetector(
+          onTap: _showEditProfileModal,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: _profileImage != null
+                ? CircleAvatar(
+                    radius: 24,
+                    backgroundImage: FileImage(_profileImage!),
+                  )
+                : CircleAvatar(
+                    radius: 24,
+                    backgroundColor: _avatarColors[_selectedAvatarIndex],
+                    child: const Icon(Icons.person, color: Colors.white),
+                  ),
           ),
         ),
       ],
@@ -879,82 +1431,73 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             itemBuilder: (context, index) {
               final card = cards[index];
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _buildAuroraCard(
                   color: card["color"],
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (card["color"] as Color).withOpacity(0.4),
-                      blurRadius: 15,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            card["title"],
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textDark,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              card["title"],
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textDark,
+                              ),
                             ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            shape: BoxShape.circle,
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: (card["color"] as Color).withOpacity(0.25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(card["icon"], color: AppTheme.textDark),
                           ),
-                          child: Icon(card["icon"], color: AppTheme.textDark),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      card["value"],
-                      style: GoogleFonts.poppins(
-                        fontSize: 42,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textDark,
-                        height: 1.0,
+                        ],
                       ),
-                    ),
-                    if (card["hasProgress"] == true) ...[
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: LinearProgressIndicator(
-                                    value: card["progress"],
-                                    backgroundColor: Colors.white.withOpacity(0.5),
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textDark),
-                                    minHeight: 8,
+                      Text(
+                        card["value"],
+                        style: GoogleFonts.poppins(
+                          fontSize: 42,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textDark,
+                          height: 1.0,
+                        ),
+                      ),
+                      if (card["hasProgress"] == true) ...[
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: LinearProgressIndicator(
+                                      value: card["progress"],
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textDark),
+                                      minHeight: 8,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                "${(card["progress"] * 100).toInt()}%",
-                                style: GoogleFonts.poppins(
+                                const SizedBox(width: 10),
+                                Text(
+                                  "${(card["progress"] * 100).toInt()}%",
+                                  style: GoogleFonts.poppins(
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.textDark,
                                   fontSize: 12,
@@ -1009,7 +1552,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       )
                   ],
                 ),
-              );
+              ),
+            );
             },
           ),
         ),
